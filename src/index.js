@@ -57,10 +57,10 @@ async function main() {
       );
 
       sourcePath = sourcePath || config.source;
-      sourceListPath = sourceListPath || config.sources;
+      sourceListPath = sourceListPath.length == 0 || config.sources;
       targetPath = targetPath || config.target;
       serverIdInput = serverIdInput || config.server;
-      serverIds = serverIds || config.servers;
+      serverIds = serverIds.length == 0 || config.servers;
     }
 
     // check if sourcePath and sourceListPath are both empty
