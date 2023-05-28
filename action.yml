@@ -1,5 +1,5 @@
-name: "Pterodactyl Upload Action"
-description: "Upload files to pterodactyl instances"
+name: "Upload files to Pterodactyl"
+description: "This GitHub Action allows you to upload files to multiple Pterodactyl servers with just one action, featuring socket support."
 inputs:
   panel-host: # id of input
     description: "The host of the pterodactyl instance"
