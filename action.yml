@@ -1,0 +1,34 @@
+name: "Pterodactyl Upload Action"
+description: "Upload files to pterodactyl instances"
+inputs:
+  panel-host: # id of input
+    description: "The host of the pterodactyl instance"
+    required: true
+  api-key:
+    description: "The client api key of the pterodactyl instance"
+    required: true
+  server-id:
+    description: "The server id of the server"
+    required: false
+  server-ids:
+    description: "The server ids of the servers"
+    required: false
+  source:
+    description: "The source to upload"
+    required: false
+  sources:
+    description: "The sources to upload"
+    required: false
+  target:
+    description: "The target where the files should be uploaded on the servers"
+    required: true
+  restart:
+    description: "Restart the servers after the upload"
+    required: false
+    default: false
+  proxy:
+    description: "The proxy to use"
+    required: false
+runs:
+  using: "node16"
+  main: "dist/index.js"
