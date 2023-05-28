@@ -1,154 +1,169 @@
 const core = require("@actions/core");
-const github = require("@actions/github");
-const StaticAxios = require("axios");
-const axios = StaticAxios.create({
-  headers: {
-    Accept: "application/json",
-  },
-});
-const fs = require("fs");
+const axios = require("axios").default;
+const fs = require("fs").promises;
+const path = require("path");
+
+axios.defaults.headers.common.Accept = "application/json";
 
 async function main() {
   try {
-    const panelHost = core.getInput("panel-host", {
-      required: true,
-      trimWhitespace: true,
-    });
-    const apiKey = core.getInput("api-key", {
-      required: true,
-      trimWhitespace: true,
-    });
-    let sourcePath = core.getInput("source", {
-      required: false,
-      trimWhitespace: true,
-    });
-    let sourceListPath = core.getMultilineInput("sources", {
-      required: false,
-      trimWhitespace: true,
-    });
-    let targetPath = core.getInput("target", {
-      required: true,
-      trimWhitespace: true,
-    });
-    let serverIdInput = core.getInput("server-id", {
-      required: false,
-      trimWhitespace: true,
-    });
-    let serverIds = core.getMultilineInput("server-ids", {
-      required: false,
-      trimWhitespace: true,
-    });
-    const restart =
-      core.getInput("restart", {
-        required: false,
-        trimWhitespace: true,
-      }) == "true";
+    const settings = await getSettings();
+    configureAxios(settings.panelHost, settings.apiKey, settings.proxy);
 
-    const proxy = core.getInput("proxy", {
-      required: false,
-      trimWhitespace: true,
-    });
+    const { serverIds, sourceListPath, targetPath, restart } = settings;
 
-    // check if .pterodactyl-upload.json exists
-    if (fs.existsSync(".pterodactyl-upload.json")) {
-      core.info("Found .pterodactyl-upload.json, using it for configuration.");
-      const config = JSON.parse(
-        fs.readFileSync(".pterodactyl-upload.json", "utf8")
-      );
+    for (const serverId of serverIds) {
+      for (const source of sourceListPath) {
+        await validateSourceFile(source);
+        const targetFile = getTargetFile(targetPath, source);
+        const buffer = await fs.readFile(source);
 
-      sourcePath = sourcePath || config.source || "";
-      sourceListPath =
-        sourceListPath.length == 0 ? config.sources || [] : sourceListPath;
-      targetPath = targetPath || config.target || "";
-      serverIdInput = serverIdInput || config.server || "";
-      serverIds = serverIds.length == 0 ? config.servers || [] : serverIds;
-    }
+        await uploadFile(serverId, targetFile, buffer);
 
-    // check if sourcePath and sourceListPath are both empty
-    if (!sourcePath && sourceListPath.length == 0) {
-      throw new Error(
-        "Either source or sources must be defined. Both are empty."
-      );
-    }
-    // check if serverId and serverIds are both empty
-    if (!serverIdInput && serverIds.length == 0) {
-      throw new Error(
-        "Either server-id or server-ids must be defined. Both are empty."
-      );
-    }
-    if (!!sourcePath && sourceListPath.length == 0) {
-      sourceListPath = [sourcePath];
-    }
-    if (!!serverIdInput && serverIds.length == 0) {
-      serverIds = [serverIdInput];
-    }
-
-    axios.defaults.baseURL = panelHost;
-    axios.defaults.headers.common["Authorization"] = `Bearer ${apiKey}`;
-
-    if (proxy) {
-      axios.defaults.proxy = {
-        protocol: "http",
-        host: proxy.split("@")[1].split(":")[0],
-        port: proxy.split("@")[1].split(":")[1],
-        auth: {
-          username: proxy.split("@")[0].split(":")[0],
-          password: proxy.split("@")[0].split(":")[1],
-        },
-      };
-    }
-
-    // for each server
-    for (let serverId of serverIds) {
-      for (let source of sourceListPath) {
-        const isDirectory = fs.lstatSync(source).isDirectory();
-        let targetFile = targetPath;
-
-        if (isDirectory) {
-          throw new Error("Source must be a file, not a directory");
-        }
-
-        if (!fs.existsSync(source)) {
-          throw new Error(`Source file ${source} does not exist.`);
-        }
-
-        // check if targetFile is a directory
-        if (targetFile.endsWith("/")) {
-          // if targetFile is a directory, append the source filename to the targetFile
-          targetFile += source.split("/").pop();
-        }
-
-        const buffer = fs.readFileSync(source);
-
-        await axios.post(
-          `/api/client/servers/${serverId}/files/write`,
-          buffer,
-          {
-            params: {
-              file: targetFile,
-            },
-            onUploadProgress: (progressEvent) => {
-              const percentCompleted = Math.round(
-                (progressEvent.loaded * 100) / progressEvent.total
-              );
-              core.info(
-                `Uploading ${source} to ${serverId} (${percentCompleted}%)`
-              );
-            },
-          }
-        );
-      }
-
-      if (restart) {
-        await axios.post(`/api/client/servers/${serverId}/power`, {
-          signal: "restart",
-        });
+        if (restart) await restartServer(serverId);
       }
     }
 
     core.info("Done");
   } catch (error) {
     core.setFailed(error.message);
+  }
+}
+
+async function getSettings() {
+  const panelHost = getInput("panel-host", { required: true });
+  const apiKey = getInput("api-key", { required: true });
+  const restart = getInput("restart") == "true";
+  const proxy = getInput("proxy");
+
+  let sourcePath = getInput("source");
+  let sourceListPath = getMultilineInput("sources");
+  let targetPath = getInput("target", { required: true });
+  let serverIdInput = getInput("server-id");
+  let serverIds = getMultilineInput("server-ids");
+
+  // Debug print out all the inputs
+  core.debug(`restart: ${restart}`);
+  core.debug(`source: ${sourcePath}`);
+  core.debug(`sources: ${sourceListPath}`);
+  core.debug(`target: ${targetPath}`);
+  core.debug(`server-id: ${serverIdInput}`);
+  core.debug(`server-ids: ${serverIds}`);
+
+  const config = await readConfigFile();
+
+  sourcePath = sourcePath || config.source || "";
+  sourceListPath = sourceListPath.length
+    ? sourceListPath
+    : config.sources || [];
+  targetPath = targetPath || config.target || "";
+  serverIdInput = serverIdInput || config.server || "";
+  serverIds = serverIds.length ? serverIds : config.servers || [];
+
+  // Debug print out all the config
+  core.debug(`config: ${JSON.stringify(config)}`);
+
+  // Debug print out all the inputs after config
+  core.debug(`source: ${sourcePath}`);
+  core.debug(`sources: ${sourceListPath}`);
+  core.debug(`target: ${targetPath}`);
+  core.debug(`server-id: ${serverIdInput}`);
+  core.debug(`server-ids: ${serverIds}`);
+
+  if (!sourcePath && !sourceListPath.length)
+    throw new Error(
+      "Either source or sources must be defined. Both are empty."
+    );
+  if (!serverIdInput && !serverIds.length)
+    throw new Error(
+      "Either server-id or server-ids must be defined. Both are empty."
+    );
+
+  if (sourcePath && !sourceListPath.length) sourceListPath = [sourcePath];
+  if (serverIdInput && !serverIds.length) serverIds = [serverIdInput];
+
+  return {
+    panelHost,
+    apiKey,
+    restart,
+    proxy,
+    sourceListPath,
+    targetPath,
+    serverIds,
+  };
+}
+
+function configureAxios(panelHost, apiKey, proxy) {
+  axios.defaults.baseURL = panelHost;
+  axios.defaults.headers.common["Authorization"] = `Bearer ${apiKey}`;
+
+  if (proxy) {
+    const [auth, hostPort] = proxy.split("@");
+    const [username, password] = auth.split(":");
+    const [host, port] = hostPort.split(":");
+
+    axios.defaults.proxy = {
+      protocol: "http",
+      host,
+      port,
+      auth: { username, password },
+    };
+  }
+}
+
+async function validateSourceFile(source) {
+  try {
+    const stats = await fs.lstat(source);
+    if (stats.isDirectory())
+      throw new Error("Source must be a file, not a directory");
+  } catch (error) {
+    throw new Error(`Source file ${source} does not exist.`);
+  }
+}
+
+function getTargetFile(targetPath, source) {
+  return targetPath.endsWith("/")
+    ? path.join(targetPath, path.basename(source))
+    : targetPath;
+}
+
+async function uploadFile(serverId, targetFile, buffer) {
+  await axios.post(`/api/client/servers/${serverId}/files/write`, buffer, {
+    params: { file: targetFile },
+    onUploadProgress: (progressEvent) => {
+      const percentCompleted = Math.round(
+        (progressEvent.loaded * 100) / progressEvent.total
+      );
+      core.info(
+        `Uploading ${targetFile} to ${serverId} (${percentCompleted}%)`
+      );
+    },
+  });
+}
+
+async function restartServer(serverId) {
+  await axios.post(`/api/client/servers/${serverId}/power`, {
+    signal: "restart",
+  });
+}
+
+function getInput(name, options = { required: false }) {
+  return core.getInput(name, { ...options, trimWhitespace: true });
+}
+
+function getMultilineInput(name, options = { required: false }) {
+  return core.getMultilineInput(name, { ...options, trimWhitespace: true });
+}
+
+async function readConfigFile() {
+  const configFile = ".pterodactyl-upload.json";
+  try {
+    await fs.access(configFile);
+    core.info(`Found ${configFile}, using it for configuration.`);
+    const config = await fs.readFile(configFile, "utf8");
+    return JSON.parse(config);
+  } catch (error) {
+    return {};
   }
 }
 
