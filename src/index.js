@@ -56,12 +56,12 @@ async function main() {
         fs.readFileSync(".pterodactyl-upload.json", "utf8")
       );
 
-      sourcePath = sourcePath || config.source;
+      sourcePath = sourcePath || config.source || "";
       sourceListPath =
         sourceListPath.length == 0 ? config.sources || [] : sourceListPath;
-      targetPath = targetPath || config.target;
-      serverIdInput = serverIdInput || config.server;
-      serverIds = serverIds.length == 0 ? config.servers : serverIds;
+      targetPath = targetPath || config.target || "";
+      serverIdInput = serverIdInput || config.server || "";
+      serverIds = serverIds.length == 0 ? config.servers || [] : serverIds;
     }
 
     // check if sourcePath and sourceListPath are both empty
