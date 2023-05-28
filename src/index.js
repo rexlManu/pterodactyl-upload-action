@@ -8,33 +8,6 @@ const axios = StaticAxios.create({
 });
 const fs = require("fs");
 
-async function exec(command, args, options) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, options);
-
-    child.stdout.on("data", (data) => {
-      process.stdout.write(data);
-    });
-    child.stderr.on("data", (data) => {
-      process.stderr.write(data);
-    });
-    child.on("close", (code) => {
-      if (code !== 0) {
-        reject(
-          new Error(
-            `Command ${command} ${args.join(" ")} exited with code ${code}`
-          )
-        );
-      }
-      resolve();
-    });
-  });
-}
-
-async function zip(srcDir, targetFile) {
-  await exec("zip", ["-r", targetFile, "."], { cwd: srcDir });
-}
-
 async function main() {
   try {
     const panelHost = core.getInput("panel-host", {
@@ -45,7 +18,7 @@ async function main() {
       required: true,
       trimWhitespace: true,
     });
-    const sourcePath = core.getInput("source", {
+    let sourcePath = core.getInput("source", {
       required: false,
       trimWhitespace: true,
     });
@@ -53,11 +26,11 @@ async function main() {
       required: false,
       trimWhitespace: true,
     });
-    const targetPath = core.getInput("target", {
+    let targetPath = core.getInput("target", {
       required: true,
       trimWhitespace: true,
     });
-    const serverIdInput = core.getInput("server-id", {
+    let serverIdInput = core.getInput("server-id", {
       required: false,
       trimWhitespace: true,
     });
@@ -76,22 +49,36 @@ async function main() {
       trimWhitespace: true,
     });
 
+    // check if .pterodactyl-upload.json exists
+    if (fs.existsSync(".pterodactyl-upload.json")) {
+      core.info("Found .pterodactyl-upload.json, using it for configuration.");
+      const config = JSON.parse(
+        fs.readFileSync(".pterodactyl-upload.json", "utf8")
+      );
+
+      sourcePath = sourcePath || config.source;
+      sourceListPath = sourceListPath || config.sources;
+      targetPath = targetPath || config.target;
+      serverIdInput = serverIdInput || config.server;
+      serverIds = serverIds || config.servers;
+    }
+
     // check if sourcePath and sourceListPath are both empty
-    if (!sourcePath && !sourceListPath) {
+    if (!sourcePath && sourceListPath.length == 0) {
       throw new Error(
         "Either source or sources must be defined. Both are empty."
       );
     }
     // check if serverId and serverIds are both empty
-    if (!serverIdInput && !serverIds) {
+    if (!serverIdInput && serverIds.length == 0) {
       throw new Error(
         "Either server-id or server-ids must be defined. Both are empty."
       );
     }
-    if (sourcePath && !sourceListPath) {
+    if (!!sourcePath && sourceListPath.length == 0) {
       sourceListPath = [sourcePath];
     }
-    if (serverIdInput && !serverIds) {
+    if (!!serverIdInput && serverIds.length == 0) {
       serverIds = [serverIdInput];
     }
 
@@ -117,20 +104,22 @@ async function main() {
         let targetFile = targetPath;
 
         if (isDirectory) {
-          const zipFile = `${source}.zip`;
-          await zip(source, zipFile);
-          source = zipFile;
+          throw new Error("Source must be a file, not a directory");
+        }
 
-          if (!fs.existsSync(source)) {
-            throw new Error(`Source file ${source} does not exist.`);
-          }
+        if (!fs.existsSync(source)) {
+          throw new Error(`Source file ${source} does not exist.`);
+        }
 
-          targetFile = `${targetPath}.zip`;
+        // check if targetFile is a directory
+        if (targetFile.endsWith("/")) {
+          // if targetFile is a directory, append the source filename to the targetFile
+          targetFile += source.split("/").pop();
         }
 
         const buffer = fs.readFileSync(source);
 
-        const fileUploadResponse = await axios.post(
+        await axios.post(
           `/api/client/servers/${serverId}/files/write`,
           buffer,
           {
@@ -147,33 +136,13 @@ async function main() {
             },
           }
         );
-        core.info(fileUploadResponse.data);
-        core.info(fileUploadResponse.status);
-
-        if (isDirectory) {
-          const decompressResponse = await axios.post(
-            `/api/client/servers/${serverId}/files/decompress`,
-            {
-              root: targetPath,
-              file: targetFile,
-            }
-          );
-          core.info(decompressResponse.data);
-          core.info(decompressResponse.status);
-        }
       }
-    }
 
-    if (restart) {
-      const powerResponse = await axios.post(
-        `/api/client/servers/${serverId}/power`,
-        {
+      if (restart) {
+        await axios.post(`/api/client/servers/${serverId}/power`, {
           signal: "restart",
-        }
-      );
-
-      core.info(powerResponse.data);
-      core.info(powerResponse.status);
+        });
+      }
     }
 
     core.info("Done");
