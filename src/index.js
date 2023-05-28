@@ -175,6 +175,8 @@ async function main() {
       core.info(powerResponse.data);
       core.info(powerResponse.status);
     }
+
+    core.info("Done");
   } catch (error) {
     core.setFailed(error.message);
   }
