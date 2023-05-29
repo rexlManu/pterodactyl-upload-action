@@ -21,7 +21,7 @@ inputs:
     required: false
   target:
     description: "The target where the files should be uploaded on the servers"
-    required: true
+    required: false
   restart:
     description: "Restart the servers after the upload"
     required: false
