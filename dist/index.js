@@ -9405,7 +9405,8 @@ async function main() {
     const settings = await getSettings();
     configureAxios(settings.panelHost, settings.apiKey, settings.proxy);
 
-    const { serverIds, sourceListPath, targetPath, restart } = settings;
+    const { serverIds, sourceListPath, targetPath, restart, targets } =
+      settings;
 
     for (const serverId of serverIds) {
       for (const source of sourceListPath) {
@@ -9414,9 +9415,17 @@ async function main() {
         const buffer = await fs.readFile(source);
 
         await uploadFile(serverId, targetFile, buffer);
-
-        if (restart) await restartServer(serverId);
       }
+      for (const element of targets) {
+        const { source, target } = element;
+        await validateSourceFile(source);
+        const targetFile = getTargetFile(target, source);
+        const buffer = await fs.readFile(source);
+
+        await uploadFile(serverId, targetFile, buffer);
+      }
+
+      if (restart) await restartServer(serverId);
     }
 
     core.info("Done");
@@ -9433,7 +9442,7 @@ async function getSettings() {
 
   let sourcePath = getInput("source");
   let sourceListPath = getMultilineInput("sources");
-  let targetPath = getInput("target", { required: true });
+  let targetPath = getInput("target");
   let serverIdInput = getInput("server-id");
   let serverIds = getMultilineInput("server-ids");
 
@@ -9455,6 +9464,8 @@ async function getSettings() {
   serverIdInput = serverIdInput || config.server || "";
   serverIds = serverIds.length ? serverIds : config.servers || [];
 
+  const targets = config.targets || [];
+
   // Debug print out all the config
   core.debug(`config: ${JSON.stringify(config)}`);
 
@@ -9465,7 +9476,11 @@ async function getSettings() {
   core.debug(`server-id: ${serverIdInput}`);
   core.debug(`server-ids: ${serverIds}`);
 
-  if (!sourcePath && !sourceListPath.length)
+  if (
+    !sourcePath &&
+    !sourceListPath.length &&
+    (!targets.length || targets.length == 0)
+  )
     throw new Error(
       "Either source or sources must be defined. Both are empty."
     );
@@ -9485,6 +9500,7 @@ async function getSettings() {
     sourceListPath,
     targetPath,
     serverIds,
+    targets,
   };
 }
 
