@@ -64,6 +64,19 @@ An optional `.pterodactyl-upload.json` file can be created in the root of your r
 }
 ```
 
+#### Multiple different targets
+
+If you need different targets for each file, you can provide a list of targets.
+
+```json
+{
+  "targets": {
+    "source": "hello.txt",
+    "target": "./"
+  }
+}
+```
+
 ## License
 
 Pterodactyl Upload Action is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
