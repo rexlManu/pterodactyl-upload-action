@@ -7,6 +7,10 @@ This GitHub Action allows you to upload files to multiple Pterodactyl servers wi
 
 ## Usage
 
+## Api Key
+
+You have to create a client api key in the pterodactyl panel. You can do this in the panel under `Account` -> `API Credentials`.
+
 ### Inputs
 
 1. `panel-host`: (**Required**) The host URL of the Pterodactyl panel.
