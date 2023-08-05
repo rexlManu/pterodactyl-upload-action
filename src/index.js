@@ -10,8 +10,8 @@ async function main() {
     const settings = await getSettings();
     configureAxios(settings.panelHost, settings.apiKey, settings.proxy);
 
-    const { serverIds, sourceListPath, targetPath, restart, targets } =
-      settings;
+    const { serverIds, sourceListPath, targetPath, restart, targets, decompress } =
+        settings;
 
     for (const serverId of serverIds) {
       for (const source of sourceListPath) {
@@ -20,7 +20,12 @@ async function main() {
         const buffer = await fs.readFile(source);
 
         await uploadFile(serverId, targetFile, buffer);
+
+        if (decompress && decompress === source) {
+          await decompressFile(serverId, targetFile);
+        }
       }
+
       for (const element of targets) {
         const { source, target } = element;
         await validateSourceFile(source);
@@ -28,6 +33,10 @@ async function main() {
         const buffer = await fs.readFile(source);
 
         await uploadFile(serverId, targetFile, buffer);
+
+        if (decompress && decompress === source) {
+          await decompressFile(serverId, targetFile);
+        }
       }
 
       if (restart) await restartServer(serverId);
@@ -44,6 +53,7 @@ async function getSettings() {
   const apiKey = getInput("api-key", { required: true });
   const restart = getInput("restart") == "true";
   const proxy = getInput("proxy");
+  const decompress = getInput("decompress");
 
   let sourcePath = getInput("source");
   let sourceListPath = getMultilineInput("sources");
@@ -106,6 +116,7 @@ async function getSettings() {
     targetPath,
     serverIds,
     targets,
+    decompress,
   };
 }
 
@@ -160,6 +171,13 @@ async function uploadFile(serverId, targetFile, buffer) {
 async function restartServer(serverId) {
   await axios.post(`/api/client/servers/${serverId}/power`, {
     signal: "restart",
+  });
+}
+
+async function decompressFile(serverId, targetFile) {
+  await axios.post(`/api/client/servers/${serverId}/files/decompress`, {
+    root: "/",
+    file: targetFile,
   });
 }
 
