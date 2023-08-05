@@ -46,8 +46,11 @@ jobs:
           #     hello.txt
           #     hello2.txt
           target: "./"
-          decompress: "hello.zip"
+          decompress-target: true
 ```
+## File Decompression
+
+`decompress-target` allows decompression of archive files (`.zip, .tar, .tar.gz, .tgz, .rar`) after they are uploaded to the server. If you have multiple targets, it will decompress all valid compressed ones. If this option is not provided or set to false, files will be uploaded as is, without decompression.
 
 ### Multiple File/Server Example
 
