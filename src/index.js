@@ -10,7 +10,7 @@ async function main() {
     const settings = await getSettings();
     configureAxios(settings.panelHost, settings.apiKey, settings.proxy);
 
-    const { serverIds, sourceListPath, targetPath, restart, targets, decompress } =
+    const { serverIds, sourceListPath, targetPath, restart, targets, decompressTarget } =
         settings;
 
     for (const serverId of serverIds) {
@@ -21,7 +21,7 @@ async function main() {
 
         await uploadFile(serverId, targetFile, buffer);
 
-        if (decompress && decompress === source) {
+        if (decompressTarget && isArchiveFile(targetFile)) {
           await decompressFile(serverId, targetFile);
         }
       }
@@ -34,7 +34,7 @@ async function main() {
 
         await uploadFile(serverId, targetFile, buffer);
 
-        if (decompress && decompress === source) {
+        if (decompressTarget && isArchiveFile(targetFile)) {
           await decompressFile(serverId, targetFile);
         }
       }
@@ -53,7 +53,7 @@ async function getSettings() {
   const apiKey = getInput("api-key", { required: true });
   const restart = getInput("restart") == "true";
   const proxy = getInput("proxy");
-  const decompress = getInput("decompress");
+  const decompressTarget = getInput("decompress-target") == "true";
 
   let sourcePath = getInput("source");
   let sourceListPath = getMultilineInput("sources");
@@ -116,7 +116,7 @@ async function getSettings() {
     targetPath,
     serverIds,
     targets,
-    decompress,
+    decompressTarget,
   };
 }
 
@@ -146,6 +146,11 @@ async function validateSourceFile(source) {
   } catch (error) {
     throw new Error(`Source file ${source} does not exist.`);
   }
+}
+
+function isArchiveFile(fileName) {
+  const ext = path.extname(fileName).toLowerCase();
+  return ['.zip', '.tar', '.tar.gz', '.tgz', '.rar'].includes(ext);
 }
 
 function getTargetFile(targetPath, source) {
