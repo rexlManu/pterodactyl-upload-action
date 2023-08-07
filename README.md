@@ -46,8 +46,12 @@ jobs:
           #     hello.txt
           #     hello2.txt
           target: "./"
+          # If you want to restart the servers after successful upload
+          # restart: true
+          # If you want to decompress the files after successful upload
           # decompress-target: true
 ```
+
 ## File Decompression
 
 `decompress-target` allows decompression of archive files (`.zip, .tar, .tar.gz, .tgz, .rar`) after they are uploaded to the server. If you have multiple targets, it will decompress all valid compressed ones. If this option is not provided or set to false, files will be uploaded as is, without decompression.
