@@ -41,12 +41,12 @@ jobs:
           #   server-ids: |
           #     5f095019
           #     7f095019
-          source: "hello.zip"
+          source: "hello.txt"
           #   sources: |
           #     hello.txt
           #     hello2.txt
           target: "./"
-          decompress-target: true
+          # decompress-target: true
 ```
 ## File Decompression
 
