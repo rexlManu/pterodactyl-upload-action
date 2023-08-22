@@ -33,6 +33,9 @@ inputs:
     description: "Decompress archive file after upload in target"
     required: false
     default: false
+  follow-symbolic-links:
+    description: "Indicates whether to follow symbolic links"
+    default: true
 runs:
   using: "node16"
   main: "dist/index.js"

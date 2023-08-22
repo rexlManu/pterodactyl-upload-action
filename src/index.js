@@ -2,6 +2,7 @@ const core = require("@actions/core");
 const axios = require("axios").default;
 const fs = require("fs").promises;
 const path = require("path");
+const glob = require("@actions/glob");
 
 axios.defaults.headers.common.Accept = "application/json";
 
@@ -19,8 +20,17 @@ async function main() {
       decompressTarget,
     } = settings;
 
+    let fileSourcePaths = [];
+    for (const source of sourceListPath) {
+      const globber = await glob.create(source, {
+        followSymbolicLinks: settings.followSymbolicLinks,
+      });
+      const files = await globber.glob();
+      fileSourcePaths = [...fileSourcePaths, ...files];
+    }
+
     for (const serverId of serverIds) {
-      for (const source of sourceListPath) {
+      for (const source of fileSourcePaths) {
         await validateSourceFile(source);
         const targetFile = getTargetFile(targetPath, source);
         const buffer = await fs.readFile(source);
@@ -35,15 +45,21 @@ async function main() {
 
       for (const element of targets) {
         const { source, target } = element;
-        await validateSourceFile(source);
-        const targetFile = getTargetFile(target, source);
-        const buffer = await fs.readFile(source);
+        const globber = await glob.create(source, {
+          followSymbolicLinks: settings.followSymbolicLinks,
+        });
+        const paths = await globber.glob();
+        for (const source of paths) {
+          await validateSourceFile(source);
+          const targetFile = getTargetFile(target, source);
+          const buffer = await fs.readFile(source);
 
-        await uploadFile(serverId, targetFile, buffer);
+          await uploadFile(serverId, targetFile, buffer);
 
-        if (decompressTarget && isArchiveFile(targetFile)) {
-          await decompressFile(serverId, targetFile);
-          await deleteFile(serverId, targetFile);
+          if (decompressTarget && isArchiveFile(targetFile)) {
+            await decompressFile(serverId, targetFile);
+            await deleteFile(serverId, targetFile);
+          }
         }
       }
 
@@ -62,6 +78,7 @@ async function getSettings() {
   const restart = getInput("restart") == "true";
   const proxy = getInput("proxy");
   const decompressTarget = getInput("decompress-target") == "true";
+  const followSymbolicLinks = getInput("follow-symbolic-links") == "true";
 
   let sourcePath = getInput("source");
   let sourceListPath = getMultilineInput("sources");
@@ -125,6 +142,7 @@ async function getSettings() {
     serverIds,
     targets,
     decompressTarget,
+    followSymbolicLinks,
   };
 }
 
