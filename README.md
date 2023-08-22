@@ -35,7 +35,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - run: echo "Hello world" > hello.txt
-      - uses: rexlmanu/pterodactyl-upload-action@v1
+      - uses: rexlmanu/pterodactyl-upload-action@v2
         with:
           panel-host: ${{ secrets.PANEL_HOST }}
           api-key: ${{ secrets.API_KEY }}
