@@ -22,6 +22,8 @@ You have to create a client api key in the pterodactyl panel. You can do this in
 7. `target`: Destination of the file on the server. Can be a file name (for a single source) or a directory name ending with a slash (for multiple files).
 8. `proxy`: Proxy to be used for upload (username:password@host:port).
 
+All file inputs support glob patterns.
+
 ### Example Workflow Configuration
 
 ```yaml
