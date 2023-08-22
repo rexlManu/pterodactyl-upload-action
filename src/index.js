@@ -10,8 +10,14 @@ async function main() {
     const settings = await getSettings();
     configureAxios(settings.panelHost, settings.apiKey, settings.proxy);
 
-    const { serverIds, sourceListPath, targetPath, restart, targets, decompressTarget } =
-        settings;
+    const {
+      serverIds,
+      sourceListPath,
+      targetPath,
+      restart,
+      targets,
+      decompressTarget,
+    } = settings;
 
     for (const serverId of serverIds) {
       for (const source of sourceListPath) {
@@ -23,6 +29,7 @@ async function main() {
 
         if (decompressTarget && isArchiveFile(targetFile)) {
           await decompressFile(serverId, targetFile);
+          await deleteFile(serverId, targetFile);
         }
       }
 
@@ -36,6 +43,7 @@ async function main() {
 
         if (decompressTarget && isArchiveFile(targetFile)) {
           await decompressFile(serverId, targetFile);
+          await deleteFile(serverId, targetFile);
         }
       }
 
@@ -150,7 +158,7 @@ async function validateSourceFile(source) {
 
 function isArchiveFile(fileName) {
   const ext = path.extname(fileName).toLowerCase();
-  return ['.zip', '.tar', '.tar.gz', '.tgz', '.rar'].includes(ext);
+  return [".zip", ".tar", ".tar.gz", ".tgz", ".rar"].includes(ext);
 }
 
 function getTargetFile(targetPath, source) {
@@ -183,6 +191,13 @@ async function decompressFile(serverId, targetFile) {
   await axios.post(`/api/client/servers/${serverId}/files/decompress`, {
     root: "/",
     file: targetFile,
+  });
+}
+
+async function deleteFile(serverId, targetFile) {
+  await axios.post(`/api/client/servers/${serverId}/files/delete`, {
+    root: "/",
+    files: [targetFile],
   });
 }
 

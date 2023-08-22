@@ -56,6 +56,8 @@ jobs:
 
 `decompress-target` allows decompression of archive files (`.zip, .tar, .tar.gz, .tgz, .rar`) after they are uploaded to the server. If you have multiple targets, it will decompress all valid compressed ones. If this option is not provided or set to false, files will be uploaded as is, without decompression.
 
+The archive will be deleted after decompression.
+
 ### Multiple File/Server Example
 
 Uncomment lines for `server-ids`, `sources`, and `proxy` in the above example as necessary.
