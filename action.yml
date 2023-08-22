@@ -29,6 +29,10 @@ inputs:
   proxy:
     description: "The proxy to use"
     required: false
+  decompress-target:
+    description: "Decompress archive file after upload in target"
+    required: false
+    default: false
 runs:
   using: "node16"
   main: "dist/index.js"
