@@ -1,5 +1,5 @@
 const core = require("@actions/core");
-const axios = require("axios").default;
+const axios = require("axios-https-proxy-fix").default;
 const fs = require("fs").promises;
 const path = require("path");
 const glob = require("@actions/glob");
