@@ -10619,6 +10619,8 @@ async function getSettings() {
 function configureAxios(panelHost, apiKey, proxy) {
   axios.defaults.baseURL = panelHost;
   axios.defaults.headers.common["Authorization"] = `Bearer ${apiKey}`;
+  axios.defaults.maxContentLength = Infinity;
+  axios.defaults.maxBodyLength = Infinity;
 
   if (proxy) {
     const [auth, hostPort] = proxy.split("@");
