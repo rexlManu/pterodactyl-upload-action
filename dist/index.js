@@ -10500,7 +10500,9 @@ async function main() {
     }
 
     for (const serverId of serverIds) {
+      core.debug(`Uploading to server ${serverId}`);
       for (const source of fileSourcePaths) {
+        core.debug(`Processing source ${source}`);
         await validateSourceFile(source);
         const targetFile = getTargetFile(targetPath, source);
         const buffer = await fs.readFile(source);
@@ -10514,6 +10516,7 @@ async function main() {
       }
 
       for (const element of targets) {
+        core.debug(`Processing target ${JSON.stringify(element)}`);
         const { source, target } = element;
         const globber = await glob.create(source, {
           followSymbolicLinks: settings.followSymbolicLinks,
@@ -10658,17 +10661,48 @@ function getTargetFile(targetPath, source) {
 }
 
 async function uploadFile(serverId, targetFile, buffer) {
-  await axios.post(`/api/client/servers/${serverId}/files/write`, buffer, {
-    params: { file: targetFile },
-    onUploadProgress: (progressEvent) => {
-      const percentCompleted = Math.round(
-        (progressEvent.loaded * 100) / progressEvent.total
-      );
-      core.info(
-        `Uploading ${targetFile} to ${serverId} (${percentCompleted}%)`
-      );
-    },
-  });
+  core.debug(`Uploading ${targetFile} to ${serverId}`);
+  let response = await axios.post(
+    `/api/client/servers/${serverId}/files/write`,
+    buffer,
+    {
+      params: { file: targetFile },
+      onUploadProgress: (progressEvent) => {
+        const percentCompleted = Math.round(
+          (progressEvent.loaded * 100) / progressEvent.total
+        );
+        core.info(
+          `Uploading ${targetFile} to ${serverId} (${percentCompleted}%)`
+        );
+      },
+    }
+  );
+  const successful = response.status === 204;
+  if (!successful) {
+    core.debug(`Upload failed with status ${response.status}`);
+    core.debug(`Response data: ${JSON.stringify(response.data)}`);
+  }
+  // check if the response was 403 (forbidden), try again until the max retries is reached
+  let retries = 0;
+  while (response.status === 403 && retries < 3) {
+    core.info(`Upload failed, retrying...`);
+    response = await axios.post(
+      `/api/client/servers/${serverId}/files/write`,
+      buffer,
+      {
+        params: { file: targetFile },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          core.info(
+            `Uploading ${targetFile} to ${serverId} (${percentCompleted}%)`
+          );
+        },
+      }
+    );
+    retries++;
+  }
 }
 
 async function restartServer(serverId) {
@@ -10685,10 +10719,27 @@ async function decompressFile(serverId, targetFile) {
 }
 
 async function deleteFile(serverId, targetFile) {
-  await axios.post(`/api/client/servers/${serverId}/files/delete`, {
-    root: "/",
-    files: [targetFile],
-  });
+  let response = await axios.post(
+    `/api/client/servers/${serverId}/files/delete`,
+    {
+      root: "/",
+      files: [targetFile],
+    }
+  );
+
+  // check if the response was 403 (forbidden), try again until the max retries is reached
+  let retries = 0;
+  while (response.status === 403 && retries < 3) {
+    core.info(`Delete failed, retrying...`);
+    response = await axios.post(
+      `/api/client/servers/${serverId}/files/delete`,
+      {
+        root: "/",
+        files: [targetFile],
+      }
+    );
+    retries++;
+  }
 }
 
 function getInput(name, options = { required: false }) {
