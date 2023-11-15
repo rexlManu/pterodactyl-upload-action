@@ -1,8 +1,10 @@
 const core = require("@actions/core");
-const axios = require("axios-https-proxy-fix").default;
+const axios = require("axios").default;
 const fs = require("fs").promises;
 const path = require("path");
 const glob = require("@actions/glob");
+const tunnel = require("tunnel");
+const { AxiosError } = require("axios");
 
 axios.defaults.headers.common.Accept = "application/json";
 
@@ -160,12 +162,31 @@ function configureAxios(panelHost, apiKey, proxy) {
     const [username, password] = auth.split(":");
     const [host, port] = hostPort.split(":");
 
-    axios.defaults.proxy = {
-      protocol: "http",
-      host,
-      port,
-      auth: { username, password },
-    };
+    // axios.defaults.proxy = {
+    //   protocol: "http",
+    //   host,
+    //   port,
+    //   auth: { username, password },
+    // };
+
+    const httpsAgent = tunnel.httpsOverHttp({
+      proxy: {
+        host: host,
+        port: port,
+        proxyAuth: `${username}:${password}`,
+      },
+    });
+
+    var httpAgent = tunnel.httpOverHttp({
+      proxy: {
+        host: host,
+        port: port,
+        proxyAuth: `${username}:${password}`,
+      },
+    });
+
+    axios.defaults.httpsAgent = httpsAgent;
+    axios.defaults.httpAgent = httpAgent;
   }
 }
 
@@ -191,46 +212,37 @@ function getTargetFile(targetPath, source) {
 }
 
 async function uploadFile(serverId, targetFile, buffer) {
-  core.debug(`Uploading ${targetFile} to ${serverId}`);
-  let response = await axios.post(
-    `/api/client/servers/${serverId}/files/write`,
-    buffer,
-    {
-      params: { file: targetFile },
-      onUploadProgress: (progressEvent) => {
-        const percentCompleted = Math.round(
-          (progressEvent.loaded * 100) / progressEvent.total
-        );
-        core.info(
-          `Uploading ${targetFile} to ${serverId} (${percentCompleted}%)`
-        );
-      },
-    }
-  );
-  const successful = response.status === 204;
-  if (!successful) {
-    core.debug(`Upload failed with status ${response.status}`);
-    core.debug(`Response data: ${JSON.stringify(response.data)}`);
-  }
   // check if the response was 403 (forbidden), try again until the max retries is reached
   let retries = 0;
-  while (response.status === 403 && retries < 3) {
-    core.info(`Upload failed, retrying...`);
-    response = await axios.post(
-      `/api/client/servers/${serverId}/files/write`,
-      buffer,
-      {
-        params: { file: targetFile },
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          );
-          core.info(
-            `Uploading ${targetFile} to ${serverId} (${percentCompleted}%)`
-          );
-        },
+  let uploaded = false;
+  while (!uploaded && retries < 3) {
+    try {
+      response = await axios.post(
+        `/api/client/servers/${serverId}/files/write`,
+        buffer,
+        {
+          params: { file: targetFile },
+          onUploadProgress: (progressEvent) => {
+            const percentCompleted = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            core.info(
+              `Uploading ${targetFile} to ${serverId} (${percentCompleted}%)`
+            );
+          },
+        }
+      );
+      if (response?.status == 204) {
+        uploaded = true;
+      } else {
+        core.error(
+          `Upload failed with status ${response?.status}, retrying...`
+        );
       }
-    );
+    } catch (error) {
+      core.error(`Upload failed with error ${error}, retrying...`);
+      core.debug(`Error response: ${JSON.stringify(error?.response?.data)}`);
+    }
     retries++;
   }
 }
