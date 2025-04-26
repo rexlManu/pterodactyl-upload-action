@@ -18,6 +18,7 @@ async function main() {
       sourceListPath,
       targetPath,
       restart,
+      command,
       targets,
       decompressTarget,
     } = settings;
@@ -68,6 +69,7 @@ async function main() {
         }
       }
 
+      if (command != "") await sendConsoleCommand(serverId, command);
       if (restart) await restartServer(serverId);
     }
 
@@ -81,6 +83,7 @@ async function getSettings() {
   const panelHost = getInput("panel-host", { required: true });
   const apiKey = getInput("api-key", { required: true });
   const restart = getInput("restart") == "true";
+  const command = getInput("command");
   const proxy = getInput("proxy");
   const decompressTarget = getInput("decompress-target") == "true";
   const followSymbolicLinks = getInput("follow-symbolic-links") == "true";
@@ -93,6 +96,7 @@ async function getSettings() {
 
   // Debug print out all the inputs
   core.debug(`restart: ${restart}`);
+  core.debug(`command: ${command}`);
   core.debug(`source: ${sourcePath}`);
   core.debug(`sources: ${sourceListPath}`);
   core.debug(`target: ${targetPath}`);
@@ -141,6 +145,7 @@ async function getSettings() {
     panelHost,
     apiKey,
     restart,
+    command,
     proxy,
     sourceListPath,
     targetPath,
@@ -250,6 +255,12 @@ async function uploadFile(serverId, targetFile, buffer) {
 async function restartServer(serverId) {
   await axios.post(`/api/client/servers/${serverId}/power`, {
     signal: "restart",
+  });
+}
+
+async function sendConsoleCommand(serverId, command) {
+  await axios.post(`/api/client/servers/${serverId}/command`, {
+    command: command,
   });
 }
 

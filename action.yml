@@ -26,6 +26,9 @@ inputs:
     description: "Restart the servers after the upload"
     required: false
     default: false
+  command:
+    description: "Console command to run after upload"
+    required: false
   proxy:
     description: "The proxy to use"
     required: false
