@@ -69,8 +69,8 @@ async function main() {
         }
       }
 
-      if (restart) await restartServer(serverId);
       if (command != "") await sendConsoleCommand(serverId, command);
+      if (restart) await restartServer(serverId);
     }
 
     core.info("Done");
